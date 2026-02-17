@@ -1,0 +1,16 @@
+# kustomization to apply all goat network manifests at once
+# usage: kubectl apply -k k8s/
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  # goat RPC node
+  - goat-node/deployment.yaml
+  - goat-node/service.yaml
+  - goat-node/ingress.yaml
+  # monitoring
+  - monitoring/secret.yaml
+  - monitoring/deployment.yaml
+  - monitoring/service.yaml
+  - monitoring/ingress.yaml

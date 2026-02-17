@@ -1,0 +1,18 @@
+# environment files
+.env
+
+# chain data
+data/
+
+# go build artifacts
+monitoring/goat-monitor
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

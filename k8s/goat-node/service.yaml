@@ -1,0 +1,24 @@
+# goat RPC node service
+# exposes geth HTTP RPC and WebSocket RPC within the cluster
+apiVersion: v1
+kind: Service
+metadata:
+  name: goat-node
+  namespace: goat-network
+  labels:
+    app.kubernetes.io/name: goat-node
+    app.kubernetes.io/component: blockchain
+    app.kubernetes.io/part-of: goat-network
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: goat-node
+  ports:
+    - name: http-rpc
+      port: 8545
+      targetPort: http-rpc
+      protocol: TCP
+    - name: ws-rpc
+      port: 8546
+      targetPort: ws-rpc
+      protocol: TCP

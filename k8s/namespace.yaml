@@ -1,0 +1,7 @@
+# namespace for all goat network resources
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: goat-network
+  labels:
+    app.kubernetes.io/part-of: goat-network

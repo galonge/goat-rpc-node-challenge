@@ -1,0 +1,84 @@
+# goat RPC node setup with monitoring
+#
+# usage:
+#   monitor only (public RPC):  docker compose up -d --build
+#   full stack (local node):    docker compose --profile node up -d --build
+#
+# NOTE: if pulling GHCR images fails with "denied", clear stale credentials:
+#   docker logout ghcr.io
+
+name: george
+
+services:
+  # execution layer — goat-geth (EVM runtime)
+  # based on https://github.com/GOATNetwork/goat/blob/main/docker/mainnet.yaml
+  # activate with: --profile node
+  geth:
+    image: ghcr.io/goatnetwork/goat-geth:v0.4.0
+    container_name: george-goat-geth
+    restart: unless-stopped
+    stop_grace_period: 30s
+    profiles: [ "node" ]
+    command:
+      - --goat=mainnet
+      - --http
+      - --http.addr=0.0.0.0
+      - --http.api=eth,net,web3
+      - --http.vhosts=*
+      - --http.corsdomain=*
+      - --ws
+      - --ws.addr=0.0.0.0
+      - --ws.api=eth,net,web3
+      - --ws.origins=*
+    ports:
+      - "8545:8545" # HTTP RPC
+      - "8546:8546" # WebSocket RPC
+      - "30303:30303" # P2P
+    volumes:
+      - ./data/geth:/root/.ethereum
+    healthcheck:
+      test: [ "CMD", "wget", "--spider", "--quiet", "http://localhost:8545" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # consensus layer — goat decentralized sequencer
+  # activate with: --profile node
+  goat:
+    image: ghcr.io/goatnetwork/goat:v0.4.3
+    container_name: george-goat-node
+    restart: unless-stopped
+    stop_grace_period: 30s
+    profiles: [ "node" ]
+    command:
+      - start
+      - --goat.geth=/geth/geth.ipc
+      - --chain-id=goat-mainnet
+    depends_on:
+      geth:
+        condition: service_healthy
+    volumes:
+      - ./data/goat:/root/.goat
+      - ./data/geth:/geth
+    ports:
+      - "26656:26656" # P2P
+      - "26657:26657" # RPC
+
+  # monitoring exporter — custom Prometheus exporter
+  # runs by default against GOAT_RPC_NODE (public RPC or local node)
+  monitor:
+    build:
+      context: ./monitoring
+      dockerfile: Dockerfile
+    container_name: george-goat-monitor
+    restart: unless-stopped
+    environment:
+      - GOAT_RPC_NODE=${GOAT_RPC_NODE:-https://rpc.goat.network}
+    ports:
+      - "9090:9090"
+    healthcheck:
+      test: [ "CMD", "wget", "--spider", "--quiet", "http://localhost:9090/health" ]
+      interval: 15s
+      timeout: 5s
+      retries: 3

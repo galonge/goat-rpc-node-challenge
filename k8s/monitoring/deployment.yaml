@@ -1,0 +1,58 @@
+# monitoring exporter deployment
+# polls the goat RPC node and exposes Prometheus metrics + JSON health
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: goat-monitor
+  namespace: goat-network
+  labels:
+    app.kubernetes.io/name: goat-monitor
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: goat-network
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: goat-monitor
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: goat-monitor
+        app.kubernetes.io/component: monitoring
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: monitor
+          image: goat-monitor:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 9090
+              protocol: TCP
+          envFrom:
+            - secretRef:
+                name: goat-monitor-secret
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "32Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5

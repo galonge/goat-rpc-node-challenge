@@ -1,0 +1,145 @@
+# goat RPC node deployment
+# runs geth (execution layer) + goat (consensus layer) as sidecar containers
+# based on https://github.com/GOATNetwork/goat/blob/main/docker/mainnet.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: goat-node
+  namespace: goat-network
+  labels:
+    app.kubernetes.io/name: goat-node
+    app.kubernetes.io/component: blockchain
+    app.kubernetes.io/part-of: goat-network
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate  # avoid dual-write on PVC
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: goat-node
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: goat-node
+        app.kubernetes.io/component: blockchain
+    spec:
+      containers:
+        # execution layer — goat-geth (EVM runtime)
+        - name: geth
+          image: ghcr.io/goatnetwork/goat-geth:v0.4.0
+          args:
+            - --goat=mainnet
+            - --http
+            - --http.addr=0.0.0.0
+            - --http.api=eth,net,web3
+            - --http.vhosts=*
+            - --http.corsdomain=*
+            - --ws
+            - --ws.addr=0.0.0.0
+            - --ws.api=eth,net,web3
+            - --ws.origins=*
+          ports:
+            - name: http-rpc
+              containerPort: 8545
+              protocol: TCP
+            - name: ws-rpc
+              containerPort: 8546
+              protocol: TCP
+            - name: p2p
+              containerPort: 30303
+              protocol: TCP
+          volumeMounts:
+            - name: geth-data
+              mountPath: /root/.ethereum
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http-rpc
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http-rpc
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+
+        # consensus layer — goat decentralized sequencer
+        - name: goat
+          image: ghcr.io/goatnetwork/goat:v0.4.3
+          command: ["goatd"]
+          args:
+            - start
+            - --goat.geth=/geth/geth.ipc
+            - --chain-id=goat-mainnet
+          ports:
+            - name: consensus-p2p
+              containerPort: 26656
+              protocol: TCP
+            - name: consensus-rpc
+              containerPort: 26657
+              protocol: TCP
+          volumeMounts:
+            - name: goat-data
+              mountPath: /root/.goat
+            - name: geth-data
+              mountPath: /geth
+              readOnly: true
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "2Gi"
+
+      volumes:
+        - name: geth-data
+          persistentVolumeClaim:
+            claimName: geth-data-pvc
+        - name: goat-data
+          persistentVolumeClaim:
+            claimName: goat-data-pvc
+
+---
+# persistent storage for geth chain data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: geth-data-pvc
+  namespace: goat-network
+  labels:
+    app.kubernetes.io/name: goat-node
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+# persistent storage for goat consensus data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: goat-data-pvc
+  namespace: goat-network
+  labels:
+    app.kubernetes.io/name: goat-node
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi

@@ -1,0 +1,23 @@
+# monitoring exporter ingress
+# routes external traffic to the monitoring HTTP dashboard
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: goat-monitor
+  namespace: goat-network
+  labels:
+    app.kubernetes.io/name: goat-monitor
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: goat-network
+spec:
+  rules:
+    - host: goat-monitor.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: goat-monitor
+                port:
+                  name: http

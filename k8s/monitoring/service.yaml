@@ -1,0 +1,19 @@
+# monitoring exporter service
+apiVersion: v1
+kind: Service
+metadata:
+  name: goat-monitor
+  namespace: goat-network
+  labels:
+    app.kubernetes.io/name: goat-monitor
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: goat-network
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: goat-monitor
+  ports:
+    - name: http
+      port: 9090
+      targetPort: http
+      protocol: TCP

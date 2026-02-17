@@ -235,6 +235,28 @@ kubectl delete -k k8s/
 k3d cluster delete goat-sre
 ```
 
+### Deploying to Other Kubernetes Environments
+
+The manifests are tested with k3d (Traefik) but work on any Kubernetes distribution with minor adjustments:
+
+**Ingress controller** — the ingress manifests omit `ingressClassName` since k3d's Traefik auto-claims them. For other clusters, add the appropriate class to both `k8s/goat-node/ingress.yaml` and `k8s/monitoring/ingress.yaml`:
+
+```yaml
+spec:
+  ingressClassName: nginx  # or traefik, alb, etc.
+```
+
+**PVC sizing** — the PVCs are set to 5Gi/1Gi for local testing. For production nodes, increase `geth-data-pvc` to at least 100Gi in `k8s/goat-node/deployment.yaml`.
+
+**Monitor image** — instead of `k3d image import`, push the image to a container registry your cluster can pull from:
+
+```bash
+docker tag goat-monitor:latest <your-registry>/goat-monitor:latest
+docker push <your-registry>/goat-monitor:latest
+```
+
+Then update the image reference in `k8s/monitoring/deployment.yaml`.
+
 ---
 
 ## Configuration Reference
